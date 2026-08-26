@@ -44,5 +44,6 @@ src/generated/resources/.cache/*
 src/dev/java/resources/assets/*
 src/generated/resources/assets/tfg/lang/*
 *.jar
+!gradle/wrapper/gradle-wrapper.jar
 .DS_Store
 .java-version
