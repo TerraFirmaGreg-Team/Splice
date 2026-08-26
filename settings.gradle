@@ -1,0 +1,72 @@
+pluginManagement {
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        gradlePluginPortal()
+        maven { url = 'https://maven.minecraftforge.net/' }
+        maven { url = 'https://maven.fabricmc.net/' }
+        maven { url = 'https://maven.neoforged.net/releases' }
+        maven {
+            url = 'https://maven.wagyourtail.xyz/releases'
+            content { includeGroupByRegex 'xyz\\.wagyourtail.*' }
+        }
+        maven {
+            url = 'https://maven.wagyourtail.xyz/snapshots'
+            content { includeGroupByRegex 'xyz\\.wagyourtail.*' }
+        }
+        maven {
+            url = 'https://maven.arcseekers.com/releases'
+            content { includeGroupByRegex 'xyz\\.wagyourtail.*' }
+        }
+        maven {
+            url = 'https://jitpack.io'
+            content {
+                includeGroupByRegex 'com\\.github\\..*'
+                includeGroupByRegex 'com\\.gitlab\\..*'
+                includeGroupByRegex 'io\\.github\\..*'
+            }
+        }
+        maven {
+            url = 'https://repo.spongepowered.org/maven'
+            content {
+                includeGroup 'org.spongepowered'
+                includeGroupByRegex 'org\\.spongepowered.*'
+            }
+        }
+    }
+}
+
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '0.8.0'
+}
+
+rootProject.name = 'Splice'
+
+def taskNames = settings.startParameter.taskNames.collect { it.toLowerCase(Locale.ROOT) }
+def forceGame = settings.hasProperty('includeGame') ||
+        providers.gradleProperty('includeGame').orNull == 'true'
+
+def wantsAnyGame = forceGame ||
+        taskNames.isEmpty() ||
+        taskNames.any { name ->
+            name.contains('modern') ||
+                    name.contains('vintage') ||
+                    name == 'build' ||
+                    name.endsWith(':build')
+        }
+
+def needModern = wantsAnyGame || taskNames.any { it.contains(':modern') || it.startsWith('modern') }
+def needVintage = wantsAnyGame || taskNames.any { it.contains(':vintage') || it.startsWith('vintage') }
+
+include ':core'
+
+if (needModern) {
+    include ':modern'
+    project(':modern').projectDir = file('projects/modern')
+}
+if (needVintage) {
+    include ':vintage'
+    project(':vintage').projectDir = file('projects/vintage')
+}
+
+project(':core').projectDir = file('projects/core')

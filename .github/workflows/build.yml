@@ -1,0 +1,219 @@
+name: "Project Build"
+run-name: "[📦]: Project Build #${{ github.run_number }}"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/**'
+      - 'gradle/**'
+      - 'projects/**'
+      - '*.gradle'
+      - 'gradle.properties'
+      - 'settings.gradle'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  info:
+    name: "[🖥️] Project Info"
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.fork }}
+    outputs:
+      name: ${{ steps.check.outputs.name }}
+      version: ${{ steps.check.outputs.version }}
+      version_type: ${{ steps.check.outputs.version_type }}
+      toolchain_java: ${{ steps.check.outputs.toolchain_java }}
+      make_release: ${{ steps.check.outputs.make_release }}
+
+    steps:
+      - name: "[📦] Checkout"
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: "[📥] Get root properties"
+        id: root
+        uses: madhead/read-java-properties@latest
+        with:
+          file: gradle.properties
+          all: true
+
+      - name: "[🔍] Check if tag exists"
+        uses: mukunku/tag-exists-action@v1.7.0
+        id: tag_check
+        with:
+          tag: ${{ steps.root.outputs.mod_version }}
+
+      - name: "[🔍] Check"
+        id: check
+        shell: bash
+        run: |
+          TAG_EXISTS="${{ steps.tag_check.outputs.exists }}"
+          IS_RELEASE_CANDIDATE="false"
+          if [[ "$TAG_EXISTS" == "false" && -n "${{ steps.root.outputs.mod_version }}" ]]; then
+            IS_RELEASE_CANDIDATE="true"
+          fi
+
+          if [[ "$IS_RELEASE_CANDIDATE" == "true" ]]; then
+            PROJECT_VERSION="${{ steps.root.outputs.mod_version }}"
+            PROJECT_VERSION_TYPE="${{ steps.root.outputs.mod_version_type }}"
+          else
+            PROJECT_VERSION="${{ steps.root.outputs.mod_version }}-build-${{ github.run_number }}"
+            PROJECT_VERSION_TYPE="Unreleased"
+          fi
+
+          echo "name=${{ steps.root.outputs.mod_name }}" >> $GITHUB_OUTPUT
+          echo "version=$PROJECT_VERSION" >> $GITHUB_OUTPUT
+          echo "version_type=$PROJECT_VERSION_TYPE" >> $GITHUB_OUTPUT
+          echo "toolchain_java=${{ steps.root.outputs.java_version }}" >> $GITHUB_OUTPUT
+          echo "make_release=$IS_RELEASE_CANDIDATE" >> $GITHUB_OUTPUT
+          echo "exists=$TAG_EXISTS" >> $GITHUB_OUTPUT
+
+      - name: "[📝] Build summary"
+        uses: WcAServices/markdown-template-action@v1.1.1
+        with:
+          template: |
+            ## 📊 Build Information
+
+            ### Project Info
+            | Parameter | Value |
+            |-----------|-------|
+            | 📃 **Name** | `${{ steps.check.outputs.name }}` |
+            | 📃 **Version** | `${{ steps.check.outputs.version }}` |
+            | 📃 **Release Type** | `${{ steps.check.outputs.version_type }}` |
+            | 📃 **Loaders Version** | `${{ steps.check.outputs.toolchain_java }}` 
+
+            ### Build Decision
+            | Parameter | Value |
+            |-----------|-------|
+            | 📃 **Tag Exists** | `${{ steps.check.outputs.exists }}` |
+            | 📃 **Make Release** | `${{ steps.check.outputs.make_release }}` |
+
+  platform:
+    name: "[📦] ${{ matrix.platform }}"
+    needs: [ info ]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: modern
+          - platform: vintage
+    steps:
+      - name: "[📦] Checkout"
+        uses: actions/checkout@v7
+
+      - name: "[📥] Platform properties"
+        id: props
+        uses: madhead/read-java-properties@latest
+        with:
+          file: projects/${{ matrix.platform }}/gradle.properties
+          all: true
+
+      - name: "[🔄] Replace version"
+        shell: bash
+        run: |
+          sed -i "s/^mod_version[[:space:]]*=.*/mod_version = ${{ needs.info.outputs.version }}/g" gradle.properties
+
+      - name: "[📁] Setup Java"
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: |
+            ${{ steps.props.outputs.java_version }}
+            ${{ needs.info.outputs.toolchain_java }}
+          cache: 'gradle'
+
+      - name: "[🔨] Build"
+        run: |
+          chmod +x gradlew
+          ./gradlew :${{ matrix.platform }}:remapShadowJar --no-daemon
+          ls -la build/libs/
+
+      - name: "[🚀] Upload Artifact"
+        uses: actions/upload-artifact@v4
+        with:
+          name: Splice-${{ matrix.platform }}
+          path: build/libs/Splice-${{ steps.props.outputs.mod_name_suffix }}-*.jar
+          if-no-files-found: error
+
+      - name: "[🔒] Verify publish"
+        if: ${{ needs.info.outputs.make_release == 'true' }}
+        shell: bash
+        run: |
+          if [ -z "${{ secrets.MODRINTH_TOKEN }}" ]; then
+            echo "::error::MODRINTH_TOKEN not found"
+            exit 1
+          fi
+          if [ -z "${{ secrets.CURSEFORGE_TOKEN }}" ]; then
+            echo "::error::CURSEFORGE_TOKEN not found"
+            exit 1
+          fi
+          if [ -z "${{ vars.MODRINTH_ID }}" ]; then
+            echo "::error::MODRINTH_ID not set (GitHub vars)"
+            exit 1
+          fi
+          if [ -z "${{ vars.CURSEFORGE_ID }}" ]; then
+            echo "::error::CURSEFORGE_ID not set (GitHub vars)"
+            exit 1
+          fi
+          JAR="${{ needs.info.outputs.name }}-${{ steps.props.outputs.mod_name_suffix }}-${{ needs.info.outputs.version }}.jar"
+          if [ ! -f "build/libs/$JAR" ]; then
+            echo "::error::Artifact not found: $JAR"
+            ls -la build/libs/
+            exit 1
+          fi
+          echo "jar=$JAR" >> $GITHUB_ENV
+
+      - name: "[🚀] Publish"
+        if: ${{ needs.info.outputs.make_release == 'true' }}
+        uses: Xikaro/game-publish@3.4.0
+        with:
+          modrinth-id: ${{ vars.MODRINTH_ID }}
+          modrinth-token: ${{ secrets.MODRINTH_TOKEN }}
+          curseforge-id: ${{ vars.CURSEFORGE_ID }}
+          curseforge-token: ${{ secrets.CURSEFORGE_TOKEN }}
+          files: build/libs/${{ env.jar }}
+          name: ${{ needs.info.outputs.name }}-${{ steps.props.outputs.mod_name_suffix }}-${{ needs.info.outputs.version }}
+          version: ${{ needs.info.outputs.version }}
+          version-type: ${{ needs.info.outputs.version_type }}
+          loaders: ${{ steps.props.outputs.loader }}
+          game-versions: ${{ steps.props.outputs.minecraft_version }}
+          game-version-filter: none
+          environment: client
+          java: ${{ steps.props.outputs.java_version }}
+          retry-attempts: 2
+          retry-delay: 10000
+          fail-mode: fail
+
+  github-release:
+    name: "[🚀] GitHub Release"
+    needs: [ info, platform ]
+    runs-on: ubuntu-latest
+    if: ${{ needs.info.outputs.make_release == 'true' }}
+    steps:
+      - name: "[📦] Download artifacts"
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+
+      - name: "[🚀] GitHub Release"
+        uses: softprops/action-gh-release@v3.0.2
+        with:
+          name: ${{ needs.info.outputs.version }}
+          tag_name: ${{ needs.info.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ needs.info.outputs.version_type != 'release' }}
+          files: |
+            Splice-Modern-*.jar
+            Splice-Vintage-*.jar
+          token: ${{ secrets.GITHUB_TOKEN }}
