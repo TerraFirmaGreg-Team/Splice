@@ -33,7 +33,6 @@ subprojects {
             url = 'https://repo.spongepowered.org/maven'
             content {
                 includeGroup 'org.spongepowered'
-                includeGroupByRegex 'org\\.spongepowered.*'
             }
         }
     }

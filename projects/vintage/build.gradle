@@ -1,6 +1,6 @@
 plugins {
     id 'com.gradleup.shadow'
-    id 'xyz.wagyourtail.unimined' version '1.4.36-kappa'
+    id 'xyz.wagyourtail.unimined' version '1.4.37-kappa'
 }
 
 base {
@@ -61,9 +61,9 @@ shadowJar {
     exclude 'com/google/gson/**'
     manifest {
         attributes(
-            'ModType': 'CRL',
-            'FMLCorePluginContainsFMLMod': 'true',
-            'ForceLoadAsMod': 'true'
+                'ModType': 'CRL',
+                'FMLCorePluginContainsFMLMod': 'true',
+                'ForceLoadAsMod': 'true'
         )
     }
 }
@@ -72,22 +72,22 @@ jar {
     enabled = false
     manifest {
         attributes(
-            'ModType': 'CRL',
-            'FMLCorePluginContainsFMLMod': 'true',
-            'ForceLoadAsMod': 'true'
+                'ModType': 'CRL',
+                'FMLCorePluginContainsFMLMod': 'true',
+                'ForceLoadAsMod': 'true'
         )
     }
 }
 
 processResources {
     var replaceProperties = [
-            'mod_id'          : "${mod_id}",
-            'mod_name'        : "${mod_name}",
-            'mod_version'     : "${mod_version}",
-            'mod_description' : "${mod_description}",
-            'mod_authors'     : "${mod_authors}",
-            'mod_url'         : "${mod_url}",
-            'mod_logo_path'   : "${mod_logo_path}",
+            'mod_id'         : "${mod_id}",
+            'mod_name'       : "${mod_name}",
+            'mod_version'    : "${mod_version}",
+            'mod_description': "${mod_description}",
+            'mod_authors'    : "${mod_authors}",
+            'mod_url'        : "${mod_url}",
+            'mod_logo_path'  : "${mod_logo_path}",
     ]
     inputs.properties replaceProperties
     filesMatching(['mcmod.info']) { fcd ->

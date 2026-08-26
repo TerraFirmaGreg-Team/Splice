@@ -89,7 +89,7 @@ jobs:
             | 📃 **Name** | `${{ steps.check.outputs.name }}` |
             | 📃 **Version** | `${{ steps.check.outputs.version }}` |
             | 📃 **Release Type** | `${{ steps.check.outputs.version_type }}` |
-            | 📃 **Loaders Version** | `${{ steps.check.outputs.toolchain_java }}` 
+            | 📃 **Toolchain Version** | `${{ steps.check.outputs.toolchain_java }}` 
 
             ### Build Decision
             | Parameter | Value |
