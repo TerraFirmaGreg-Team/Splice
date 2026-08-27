@@ -1,100 +1,30 @@
 plugins {
-    id 'com.gradleup.shadow'
-    id 'xyz.wagyourtail.unimined' version '1.4.37-kappa'
+    id 'java'
+    alias(libs.plugins.unimined)
+    alias(libs.plugins.shadow)
 }
 
 base {
     archivesName = "${mod_name}-${mod_name_suffix}"
 }
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(rootProject.findProperty('java_version') as String)
-    }
-}
-
-tasks.withType(JavaCompile).configureEach {
-    options.release = 21
-}
-
-configurations {
-    embed
-    coreLib
-    compileOnly.extendsFrom(coreLib)
-}
-
-evaluationDependsOn(':core')
-
-dependencies {
-    coreLib project(':core')
-    embed project(':core')
-}
-
-unimined.minecraft {
-    version minecraft_version
-
-    mappings {
-        mcp('stable', '39-1.12')
-        devFallbackNamespace('searge')
-    }
-
-    cleanroom {
-        loader(loader_version)
-    }
-
-    defaultRemapJar = false
-
-    remap(tasks.shadowJar) {
-    }
-
-    mods {
-        remap(configurations.runtimeOnly)
-        remap(configurations.implementation)
+unimined {
+    minecraft {
+        version minecraft_version
+        mappings {
+            mcp('stable', '39-1.12')
+        }
+        cleanroom {
+            loader loader_version
+        }
+        combineWith ':core:main'
+        defaultRemapJar = false
+        remap(tasks.shadowJar)
     }
 }
 
 shadowJar {
-    archiveClassifier.set('')
-    configurations = [project.configurations.embed]
-    mergeServiceFiles()
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-    exclude 'com/google/gson/**'
     manifest {
-        attributes(
-                'ModType': 'CRL',
-                'FMLCorePluginContainsFMLMod': 'true',
-                'ForceLoadAsMod': 'true'
-        )
+        attributes 'ModType': 'CRL'
     }
-}
-
-jar {
-    enabled = false
-    manifest {
-        attributes(
-                'ModType': 'CRL',
-                'FMLCorePluginContainsFMLMod': 'true',
-                'ForceLoadAsMod': 'true'
-        )
-    }
-}
-
-processResources {
-    var replaceProperties = [
-            'mod_id'         : "${mod_id}",
-            'mod_name'       : "${mod_name}",
-            'mod_version'    : "${mod_version}",
-            'mod_description': "${mod_description}",
-            'mod_authors'    : "${mod_authors}",
-            'mod_url'        : "${mod_url}",
-            'mod_logo_path'  : "${mod_logo_path}",
-    ]
-    inputs.properties replaceProperties
-    filesMatching(['mcmod.info']) { fcd ->
-        fcd.expand(replaceProperties)
-    }
-}
-
-tasks.named('build') {
-    dependsOn tasks.named('remapShadowJar')
 }

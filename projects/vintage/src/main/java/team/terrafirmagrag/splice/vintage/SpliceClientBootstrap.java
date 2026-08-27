@@ -24,10 +24,11 @@ public final class SpliceClientBootstrap {
     if (!(mc.getResourceManager() instanceof SimpleReloadableResourceManager reloadable)) {
       return;
     }
+
     SpliceResourcePack pack = new SpliceResourcePack(SpliceMod.CACHE);
     reloadable.registerReloadListener(pack);
-    reloadable.reloadResourcePack(pack);
     registered = true;
+    mc.refreshResources();
     SpliceMod.LOGGER.info("Splice vintage resource pack registered");
   }
 }

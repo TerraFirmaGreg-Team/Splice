@@ -10,11 +10,13 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.PreparableReloadListener;
 import net.minecraft.server.packs.resources.Resource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.profiling.ProfilerFiller;
+import org.jetbrains.annotations.NotNull;
 import team.terrafirmagrag.splice.format.JsonLangFormat;
 import team.terrafirmagrag.splice.merge.LangFragmentMerger;
 import team.terrafirmagrag.splice.merge.MergePolicy;
@@ -22,6 +24,7 @@ import team.terrafirmagrag.splice.model.LocaleKey;
 import team.terrafirmagrag.splice.model.MergedLangCache;
 import team.terrafirmagrag.splice.model.MergedLangTable;
 import team.terrafirmagrag.splice.modern.SpliceMod;
+import team.terrafirmagrag.splice.modern.pack.SplicePackResources;
 import team.terrafirmagrag.splice.util.LangPaths;
 
 public final class LangCacheBuilder implements PreparableReloadListener {
@@ -35,7 +38,7 @@ public final class LangCacheBuilder implements PreparableReloadListener {
   }
 
   @Override
-  public CompletableFuture<Void> reload(
+  public @NotNull CompletableFuture<Void> reload(
       PreparationBarrier barrier,
       ResourceManager manager,
       ProfilerFiller preparationProfiler,
@@ -49,6 +52,10 @@ public final class LangCacheBuilder implements PreparableReloadListener {
               cache.replace(tables);
               SpliceMod.LOGGER.info(
                   "Splice merged {} namespace/locale lang table(s)", tables.size());
+              Minecraft mc = Minecraft.getInstance();
+              if (mc.getLanguageManager() != null) {
+                mc.getLanguageManager().onResourceManagerReload(manager);
+              }
             },
             gameExecutor);
   }
@@ -71,14 +78,14 @@ public final class LangCacheBuilder implements PreparableReloadListener {
     Set<String> locales = new HashSet<>();
     Map<ResourceLocation, List<Resource>> stacks =
         manager.listResourceStacks(
-            "lang/",
+            "lang",
             loc ->
                 loc.getNamespace().equals(namespace)
-                    && (LangPaths.flatLocaleFromJsonPath(loc.getPath()) != null
+                    && (LangPaths.flatLocale(loc.getPath(), "json") != null
                         || LangPaths.fragmentLocaleFromPath(loc.getPath()) != null));
     for (ResourceLocation id : stacks.keySet()) {
       String path = id.getPath();
-      String flatLocale = LangPaths.flatLocaleFromJsonPath(path);
+      String flatLocale = LangPaths.flatLocale(path, "json");
       if (flatLocale != null) {
         locales.add(flatLocale);
         continue;
@@ -93,14 +100,14 @@ public final class LangCacheBuilder implements PreparableReloadListener {
 
   private Map<String, String> mergeLocale(
       ResourceManager manager, String namespace, String locale) {
-    ResourceLocation flatId = new ResourceLocation(namespace, LangPaths.flatJsonPath(locale));
+    ResourceLocation flatId =
+        ResourceLocation.fromNamespaceAndPath(namespace, LangPaths.flatPath(locale, "json"));
     Map<String, String> flatLayer = mergeResourceStack(manager, flatId);
 
-    String fragmentPrefix = LangPaths.fragmentFolderPrefix(locale);
     List<String> fragmentPaths =
         manager
             .listResourceStacks(
-                fragmentPrefix,
+                "lang/" + locale,
                 loc -> loc.getNamespace().equals(namespace) && loc.getPath().endsWith(".json"))
             .keySet()
             .stream()
@@ -110,7 +117,7 @@ public final class LangCacheBuilder implements PreparableReloadListener {
 
     List<Map<String, String>> fragments = new ArrayList<>();
     for (String path : fragmentPaths) {
-      ResourceLocation fragmentId = new ResourceLocation(namespace, path);
+      ResourceLocation fragmentId = ResourceLocation.fromNamespaceAndPath(namespace, path);
       Map<String, String> fragmentLayer = mergeResourceStack(manager, fragmentId);
       if (!fragmentLayer.isEmpty()) {
         fragments.add(fragmentLayer);
@@ -124,31 +131,17 @@ public final class LangCacheBuilder implements PreparableReloadListener {
   private Map<String, String> mergeResourceStack(ResourceManager manager, ResourceLocation id) {
     Map<String, String> merged = new LinkedHashMap<>();
     for (Resource resource : manager.getResourceStack(id)) {
+      if (SplicePackResources.PACK_ID.equals(resource.sourcePackId())) {
+        continue;
+      }
       try (var in = resource.open()) {
         Map<String, String> parsed =
             JsonLangFormat.parse(in, JsonLangFormat.nestedWarningLogger(SpliceMod.LOGGER));
-        mergeLayer(merged, parsed);
+        LangFragmentMerger.mergeInto(policy, merged, parsed);
       } catch (Exception e) {
         SpliceMod.LOGGER.warn("Failed to read lang resource {}", id, e);
       }
     }
     return merged;
-  }
-
-  private void mergeLayer(Map<String, String> into, Map<String, String> layer) {
-    for (Map.Entry<String, String> entry : layer.entrySet()) {
-      String key = entry.getKey();
-      if (policy.shouldSkipKey(key)) {
-        continue;
-      }
-      String value = entry.getValue();
-      if (value == null) {
-        continue;
-      }
-      String previous = into.put(key, value);
-      if (previous != null && !previous.equals(value)) {
-        policy.onDuplicateOverride().accept(key, previous + " → " + value);
-      }
-    }
   }
 }

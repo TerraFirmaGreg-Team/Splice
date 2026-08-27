@@ -12,14 +12,14 @@ public class LangFragmentMerger {
   public Map<String, String> merge(
       MergePolicy policy, Optional<Map<String, String>> flat, List<Map<String, String>> fragments) {
     Map<String, String> merged = new LinkedHashMap<>();
-    flat.ifPresent(layer -> mergeMap(policy, merged, layer));
+    flat.ifPresent(layer -> mergeInto(policy, merged, layer));
     for (Map<String, String> fragment : fragments) {
-      mergeMap(policy, merged, fragment);
+      mergeInto(policy, merged, fragment);
     }
     return merged;
   }
 
-  private void mergeMap(MergePolicy policy, Map<String, String> into, Map<String, String> layer) {
+  public void mergeInto(MergePolicy policy, Map<String, String> into, Map<String, String> layer) {
     if (layer.isEmpty()) {
       return;
     }

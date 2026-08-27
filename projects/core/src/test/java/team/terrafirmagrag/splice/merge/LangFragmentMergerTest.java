@@ -73,7 +73,7 @@ class LangFragmentMergerTest {
     LangFragmentMerger.merge(policy, Optional.of(flat), List.of(frag));
 
     assertEquals(1, warnings.size());
-    assertTrue(warnings.getFirst().startsWith("shared:"));
+    assertTrue(warnings.get(0).startsWith("shared:"));
   }
 
   @Test

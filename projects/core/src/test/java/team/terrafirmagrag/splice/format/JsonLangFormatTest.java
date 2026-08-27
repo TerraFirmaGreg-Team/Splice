@@ -47,6 +47,19 @@ class JsonLangFormatTest {
   }
 
   @Test
+  void parsesTrailingCommasAndComments() throws Exception {
+    String json =
+        """
+        {
+          // comment
+          "item.test.sword": "Iron Sword",
+        }
+        """;
+    Map<String, String> parsed = JsonLangFormat.parse(new StringReader(json));
+    assertEquals("Iron Sword", parsed.get("item.test.sword"));
+  }
+
+  @Test
   void roundTripWrite() throws Exception {
     Map<String, String> original = Map.of("b.key", "B", "a.key", "A");
     byte[] bytes = JsonLangFormat.write(original);

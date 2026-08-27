@@ -5,10 +5,11 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.Set;
-import java.util.stream.Collectors;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.IResourceManager;
 import net.minecraft.client.resources.IResourceManagerReloadListener;
 import net.minecraft.client.resources.IResourcePack;
+import net.minecraft.client.resources.SimpleReloadableResourceManager;
 import net.minecraft.client.resources.data.IMetadataSection;
 import net.minecraft.client.resources.data.MetadataSerializer;
 import net.minecraft.util.ResourceLocation;
@@ -21,6 +22,8 @@ import team.terrafirmagrag.splice.vintage.reload.LangCacheBuilder;
 
 public final class SpliceResourcePack implements IResourcePack, IResourceManagerReloadListener {
 
+  public static final String PACK_NAME = "Splice Merged Lang";
+
   private final MergedLangCache cache;
   private final LangCacheBuilder builder;
 
@@ -31,12 +34,16 @@ public final class SpliceResourcePack implements IResourcePack, IResourceManager
 
   @Override
   public void onResourceManagerReload(IResourceManager resourceManager) {
+    if (resourceManager instanceof SimpleReloadableResourceManager reloadable) {
+      reloadable.reloadResourcePack(this);
+    }
     builder.rebuild(resourceManager);
+    Minecraft.getMinecraft().getLanguageManager().onResourceManagerReload(resourceManager);
   }
 
   @Override
   public InputStream getInputStream(ResourceLocation location) throws IOException {
-    String locale = LangPaths.flatLocaleFromLangPath(location.getPath());
+    String locale = LangPaths.flatLocale(location.getPath(), "lang");
     if (locale == null) {
       throw new IOException("Not a merged lang resource: " + location);
     }
@@ -49,7 +56,10 @@ public final class SpliceResourcePack implements IResourcePack, IResourceManager
 
   @Override
   public boolean resourceExists(ResourceLocation location) {
-    String locale = LangPaths.flatLocaleFromLangPath(location.getPath());
+    if (builder.isRebuilding()) {
+      return false;
+    }
+    String locale = LangPaths.flatLocale(location.getPath(), "lang");
     if (locale == null) {
       return false;
     }
@@ -59,14 +69,12 @@ public final class SpliceResourcePack implements IResourcePack, IResourceManager
 
   @Override
   public Set<String> getResourceDomains() {
-    return cache.snapshot().keySet().stream()
-        .map(LocaleKey::namespace)
-        .collect(Collectors.toUnmodifiableSet());
+    return builder.discoverNamespaces();
   }
 
   @Override
   public String getPackName() {
-    return "Splice Merged Lang";
+    return PACK_NAME;
   }
 
   @Override

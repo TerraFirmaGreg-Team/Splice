@@ -20,7 +20,10 @@ import org.apache.logging.log4j.Logger;
 @UtilityClass
 public class JsonLangFormat {
 
-  private final ObjectMapper MAPPER = new ObjectMapper().enable(JsonParser.Feature.ALLOW_COMMENTS);
+  private final ObjectMapper MAPPER =
+      new ObjectMapper()
+          .enable(JsonParser.Feature.ALLOW_COMMENTS)
+          .enable(JsonParser.Feature.ALLOW_TRAILING_COMMA);
 
   public Map<String, String> parse(InputStream in) throws IOException {
     return parse(in, null);
@@ -28,11 +31,7 @@ public class JsonLangFormat {
 
   public Map<String, String> parse(InputStream in, BiConsumer<String, String> onNestedSkip)
       throws IOException {
-    JsonNode root = MAPPER.readTree(in);
-    if (root == null || !root.isObject()) {
-      return Map.of();
-    }
-    return parseObject((ObjectNode) root, onNestedSkip);
+    return fromTree(MAPPER.readTree(in), onNestedSkip);
   }
 
   public Map<String, String> parse(Reader reader) throws IOException {
@@ -41,7 +40,10 @@ public class JsonLangFormat {
 
   public Map<String, String> parse(Reader reader, BiConsumer<String, String> onNestedSkip)
       throws IOException {
-    JsonNode root = MAPPER.readTree(reader);
+    return fromTree(MAPPER.readTree(reader), onNestedSkip);
+  }
+
+  private Map<String, String> fromTree(JsonNode root, BiConsumer<String, String> onNestedSkip) {
     if (root == null || !root.isObject()) {
       return Map.of();
     }

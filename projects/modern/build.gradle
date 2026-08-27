@@ -1,90 +1,43 @@
 plugins {
-    id 'com.gradleup.shadow'
-    id 'xyz.wagyourtail.unimined' version '1.4.37-kappa'
+    id 'java'
+    alias(libs.plugins.unimined)
+    alias(libs.plugins.shadow)
 }
 
 base {
     archivesName = "${mod_name}-${mod_name_suffix}"
 }
 
-java {
-    toolchain {
-        languageVersion = JavaLanguageVersion.of(rootProject.findProperty('java_version') as String)
-    }
+def embedOut = layout.buildDirectory.dir('generated/embed')
+
+tasks.register('unpackEmbed', Sync) {
+    from { configurations.embed.collect { zipTree(it) } }
+    into embedOut
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
-tasks.withType(JavaCompile).configureEach {
-    options.release = 21
-}
-
-configurations {
-    embed
-    coreLib
-    compileOnly.extendsFrom(coreLib)
-}
-
-evaluationDependsOn(':core')
-
-dependencies {
-    coreLib project(':core')
-    embed project(':core')
-    testImplementation project(':core')
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
-    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
-}
-
-unimined.minecraft {
-    version minecraft_version
-
-    minecraftForge {
-        loader(loader_version)
-    }
-
-    mappings {
-        mojmap()
-        parchment(parchment_version)
-        devFallbackNamespace('official')
-    }
-
-    defaultRemapJar = false
-
-    remap(tasks.shadowJar) {
-    }
-
-    mods {
-        remap(configurations.runtimeOnly)
-        remap(configurations.implementation)
-    }
-}
+sourceSets.main.output.classesDirs.from(embedOut)
+classes.dependsOn unpackEmbed
 
 shadowJar {
-    archiveClassifier.set('')
-    configurations = [project.configurations.embed]
-    mergeServiceFiles()
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-    exclude 'com/google/gson/**'
-    exclude 'com/google/gson/**/*.class'
-}
-
-jar {
-    enabled = false
-}
-
-processResources {
-    var replaceProperties = [
-            'mod_id'         : "${mod_id}",
-            'mod_name'       : "${mod_name}",
-            'mod_version'    : "${mod_version}",
-            'mod_description': "${mod_description}",
-            'mod_authors'    : "${mod_authors}",
-            'mod_logo_path'  : "${mod_logo_path}",
-    ]
-    inputs.properties replaceProperties
-    filesMatching(['META-INF/mods.toml']) { fcd ->
-        fcd.expand(replaceProperties)
+    exclude { details ->
+        details.file.toPath().startsWith(embedOut.get().asFile.toPath())
     }
 }
 
-tasks.named('build') {
-    dependsOn tasks.named('remapShadowJar')
+unimined {
+    minecraft {
+        version minecraft_version
+        mappings {
+            mojmap()
+            parchment(minecraft_version, parchment_version)
+            devFallbackNamespace 'mojmap'
+        }
+        minecraftForge {
+            loader loader_version
+        }
+        combineWith ':core:main'
+        defaultRemapJar = false
+        remap(tasks.shadowJar)
+    }
 }

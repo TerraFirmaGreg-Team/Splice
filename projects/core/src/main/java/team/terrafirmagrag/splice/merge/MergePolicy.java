@@ -1,6 +1,7 @@
 package team.terrafirmagrag.splice.merge;
 
 import java.util.function.BiConsumer;
+import org.apache.logging.log4j.Logger;
 
 public record MergePolicy(
     boolean skipMetadataKeys, BiConsumer<String, String> onDuplicateOverride) {
@@ -9,7 +10,7 @@ public record MergePolicy(
     return new MergePolicy(true, (key, message) -> {});
   }
 
-  public static MergePolicy withLogger(org.apache.logging.log4j.Logger logger) {
+  public static MergePolicy withLogger(Logger logger) {
     return new MergePolicy(
         true,
         (key, message) ->

@@ -1,0 +1,19 @@
+[versions]
+unimined = "1.4.37-kappa"
+shadow = "9.6.1"
+lombok = "1.18.38"
+jackson = "2.19.2"
+junit = "5.13.4"
+log4j = "2.24.3"
+
+[libraries]
+lombok = { module = "org.projectlombok:lombok", version.ref = "lombok" }
+jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+log4j-api = { module = "org.apache.logging.log4j:log4j-api", version.ref = "log4j" }
+
+[plugins]
+unimined = { id = "xyz.wagyourtail.unimined", version.ref = "unimined" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

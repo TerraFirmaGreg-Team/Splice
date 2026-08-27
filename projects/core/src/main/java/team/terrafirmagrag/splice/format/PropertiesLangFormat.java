@@ -28,11 +28,9 @@ public class PropertiesLangFormat {
     if (!Files.isRegularFile(file)) {
       return Map.of();
     }
-    Map<String, String> out = new LinkedHashMap<>();
-    try (BufferedReader reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-      parseLines(reader, out);
+    try (InputStream in = Files.newInputStream(file)) {
+      return parse(in);
     }
-    return out;
   }
 
   public byte[] write(Map<String, String> entries) {
