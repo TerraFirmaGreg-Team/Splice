@@ -1,6 +1,9 @@
 package team.terrafirmagrag.splice.model;
 
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import team.terrafirmagrag.splice.util.LangPaths;
 
 public final class MergedLangCache {
 
@@ -12,6 +15,15 @@ public final class MergedLangCache {
 
   public MergedLangTable get(LocaleKey key) {
     return tables.get(key);
+  }
+
+  public MergedLangTable tableFor(String namespace, String path, String extension) {
+    String locale = LangPaths.flatLocale(path, extension);
+    return locale == null ? null : get(new LocaleKey(namespace, locale));
+  }
+
+  public Set<String> namespaces() {
+    return tables.keySet().stream().map(LocaleKey::namespace).collect(Collectors.toUnmodifiableSet());
   }
 
   public void replace(Map<LocaleKey, MergedLangTable> next) {

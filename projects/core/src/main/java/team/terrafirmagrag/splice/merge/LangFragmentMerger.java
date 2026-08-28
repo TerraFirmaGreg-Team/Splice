@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import lombok.experimental.UtilityClass;
+import team.terrafirmagrag.splice.model.MergePolicy;
 
 @UtilityClass
 public class LangFragmentMerger {

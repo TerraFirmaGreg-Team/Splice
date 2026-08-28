@@ -1,4 +1,4 @@
-package team.terrafirmagrag.splice.merge;
+package team.terrafirmagrag.splice.model;
 
 import java.util.function.BiConsumer;
 import org.apache.logging.log4j.Logger;

@@ -1,147 +1,174 @@
 package team.terrafirmagrag.splice.modern.reload;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.resources.PreparableReloadListener;
-import net.minecraft.server.packs.resources.Resource;
-import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PathPackResources;
+import net.minecraft.server.packs.resources.*;
 import net.minecraft.util.profiling.ProfilerFiller;
 import org.jetbrains.annotations.NotNull;
 import team.terrafirmagrag.splice.format.JsonLangFormat;
 import team.terrafirmagrag.splice.merge.LangFragmentMerger;
-import team.terrafirmagrag.splice.merge.MergePolicy;
-import team.terrafirmagrag.splice.model.LocaleKey;
-import team.terrafirmagrag.splice.model.MergedLangCache;
-import team.terrafirmagrag.splice.model.MergedLangTable;
+import team.terrafirmagrag.splice.merge.LangMergePipeline;
+import team.terrafirmagrag.splice.model.*;
 import team.terrafirmagrag.splice.modern.SpliceMod;
 import team.terrafirmagrag.splice.modern.pack.SplicePackResources;
-import team.terrafirmagrag.splice.util.LangPaths;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.function.BiConsumer;
 
 public final class LangCacheBuilder implements PreparableReloadListener {
 
-  private final MergedLangCache cache;
-  private final MergePolicy policy;
+    private final MergedLangCache cache;
+    private final MergePolicy policy;
 
-  public LangCacheBuilder(MergedLangCache cache) {
-    this.cache = cache;
-    this.policy = MergePolicy.withLogger(SpliceMod.LOGGER);
-  }
+    public LangCacheBuilder(MergedLangCache cache) {
+        this.cache = cache;
+        this.policy = MergePolicy.withLogger(SpliceMod.LOGGER);
+    }
 
-  @Override
-  public @NotNull CompletableFuture<Void> reload(
-      PreparationBarrier barrier,
-      ResourceManager manager,
-      ProfilerFiller preparationProfiler,
-      ProfilerFiller reloadProfiler,
-      Executor backgroundExecutor,
-      Executor gameExecutor) {
-    return CompletableFuture.supplyAsync(() -> build(manager), backgroundExecutor)
-        .thenCompose(barrier::wait)
-        .thenAcceptAsync(
-            tables -> {
-              cache.replace(tables);
-              SpliceMod.LOGGER.info(
-                  "Splice merged {} namespace/locale lang table(s)", tables.size());
-              Minecraft mc = Minecraft.getInstance();
-              if (mc.getLanguageManager() != null) {
-                mc.getLanguageManager().onResourceManagerReload(manager);
-              }
-            },
-            gameExecutor);
-  }
-
-  private Map<LocaleKey, MergedLangTable> build(ResourceManager manager) {
-    Map<LocaleKey, MergedLangTable> out = new HashMap<>();
-    for (String namespace : manager.getNamespaces()) {
-      for (String locale : discoverLocales(manager, namespace)) {
-        LocaleKey key = new LocaleKey(namespace, locale);
-        Map<String, String> merged = mergeLocale(manager, namespace, locale);
-        if (!merged.isEmpty()) {
-          out.put(key, new MergedLangTable(merged));
+    private static MultiPackResourceManager multiPack(ResourceManager manager) {
+        if (manager instanceof MultiPackResourceManager multi) {
+            return multi;
         }
-      }
-    }
-    return out;
-  }
-
-  private Set<String> discoverLocales(ResourceManager manager, String namespace) {
-    Set<String> locales = new HashSet<>();
-    Map<ResourceLocation, List<Resource>> stacks =
-        manager.listResourceStacks(
-            "lang",
-            loc ->
-                loc.getNamespace().equals(namespace)
-                    && (LangPaths.flatLocale(loc.getPath(), "json") != null
-                        || LangPaths.fragmentLocaleFromPath(loc.getPath()) != null));
-    for (ResourceLocation id : stacks.keySet()) {
-      String path = id.getPath();
-      String flatLocale = LangPaths.flatLocale(path, "json");
-      if (flatLocale != null) {
-        locales.add(flatLocale);
-        continue;
-      }
-      String fragmentLocale = LangPaths.fragmentLocaleFromPath(path);
-      if (fragmentLocale != null) {
-        locales.add(fragmentLocale);
-      }
-    }
-    return locales;
-  }
-
-  private Map<String, String> mergeLocale(
-      ResourceManager manager, String namespace, String locale) {
-    ResourceLocation flatId =
-        ResourceLocation.fromNamespaceAndPath(namespace, LangPaths.flatPath(locale, "json"));
-    Map<String, String> flatLayer = mergeResourceStack(manager, flatId);
-
-    List<String> fragmentPaths =
-        manager
-            .listResourceStacks(
-                "lang/" + locale,
-                loc -> loc.getNamespace().equals(namespace) && loc.getPath().endsWith(".json"))
-            .keySet()
-            .stream()
-            .map(ResourceLocation::getPath)
-            .sorted()
-            .toList();
-
-    List<Map<String, String>> fragments = new ArrayList<>();
-    for (String path : fragmentPaths) {
-      ResourceLocation fragmentId = ResourceLocation.fromNamespaceAndPath(namespace, path);
-      Map<String, String> fragmentLayer = mergeResourceStack(manager, fragmentId);
-      if (!fragmentLayer.isEmpty()) {
-        fragments.add(fragmentLayer);
-      }
+        if (manager instanceof ReloadableResourceManager reloadable
+                && reloadable.resources instanceof MultiPackResourceManager multi) {
+            return multi;
+        }
+        return null;
     }
 
-    return LangFragmentMerger.merge(
-        policy, flatLayer.isEmpty() ? Optional.empty() : Optional.of(flatLayer), fragments);
-  }
-
-  private Map<String, String> mergeResourceStack(ResourceManager manager, ResourceLocation id) {
-    Map<String, String> merged = new LinkedHashMap<>();
-    for (Resource resource : manager.getResourceStack(id)) {
-      if (SplicePackResources.PACK_ID.equals(resource.sourcePackId())) {
-        continue;
-      }
-      try (var in = resource.open()) {
-        Map<String, String> parsed =
-            JsonLangFormat.parse(in, JsonLangFormat.nestedWarningLogger(SpliceMod.LOGGER));
-        LangFragmentMerger.mergeInto(policy, merged, parsed);
-      } catch (Exception e) {
-        SpliceMod.LOGGER.warn("Failed to read lang resource {}", id, e);
-      }
+    @Override
+    public @NotNull CompletableFuture<Void> reload(
+            PreparationBarrier barrier,
+            ResourceManager manager,
+            ProfilerFiller preparationProfiler,
+            ProfilerFiller reloadProfiler,
+            Executor backgroundExecutor,
+            Executor gameExecutor) {
+        return CompletableFuture.supplyAsync(() -> build(manager), backgroundExecutor)
+                .thenCompose(barrier::wait)
+                .thenAcceptAsync(
+                        tables -> {
+                            cache.replace(tables);
+                            attachMergedPack(manager);
+                            List<String> keys =
+                                    tables.keySet().stream()
+                                            .map(key -> key.namespace() + "/" + key.localeCode())
+                                            .sorted()
+                                            .toList();
+                            SpliceMod.LOGGER.info(
+                                "Splice merged {} namespace/locale lang table(s): {}",
+                                tables.size(),
+                                keys);
+                            Minecraft mc = Minecraft.getInstance();
+                            if (mc.getLanguageManager() != null) {
+                              mc.getLanguageManager().onResourceManagerReload(manager);
+                            }
+                        },
+                        gameExecutor);
     }
-    return merged;
-  }
+
+    private Map<LocaleKey, MergedLangTable> build(ResourceManager manager) {
+        Map<LocaleKey, MergedLangTable> tables =
+                LangMergePipeline.merge(packFolders(manager), extra(manager), "json", policy);
+        Set<String> known = manager.getNamespaces();
+        tables.keySet().removeIf(key -> !known.contains(key.namespace()));
+        return tables;
+    }
+
+    private Extra extra(ResourceManager manager) {
+        return new Extra() {
+            @Override
+            public Map<String, String> get(String namespace, String path) {
+                ResourceLocation id = ResourceLocation.tryBuild(namespace, path);
+                return id == null ? Map.of() : mergeResourceStack(id, manager.getResourceStack(id));
+            }
+
+            @Override
+            public void extraPaths(BiConsumer<String, String> sink) {
+                manager
+                        .listResourceStacks("lang", location -> true)
+                        .keySet()
+                        .forEach(
+                                location ->
+                                        sink.accept(
+                                                location.getNamespace(), location.getPath().toLowerCase(Locale.ROOT)));
+            }
+        };
+    }
+
+    private Map<String, String> mergeResourceStack(ResourceLocation id, List<Resource> stack) {
+        Map<String, String> merged = new LinkedHashMap<>();
+        for (Resource resource : stack) {
+            if (SplicePackResources.PACK_ID.equals(resource.sourcePackId())) {
+                continue;
+            }
+            try (var in = resource.open()) {
+                Map<String, String> parsed = JsonLangFormat.parse(in, JsonLangFormat.nestedWarningLogger(SpliceMod.LOGGER));
+                LangFragmentMerger.mergeInto(policy, merged, parsed);
+            } catch (Exception e) {
+                SpliceMod.LOGGER.warn("Failed to read lang resource {}", id, e);
+            }
+        }
+        return merged;
+    }
+
+    private List<Path> packFolders(ResourceManager manager) {
+        LinkedHashSet<Path> folders = new LinkedHashSet<>();
+        for (PackResources pack : manager.listPacks().toList()) {
+            if (SplicePackResources.PACK_ID.equals(pack.packId())) {
+                continue;
+            }
+            Path directory = directoryRoot(pack);
+            if (directory != null) {
+                folders.add(directory);
+            }
+        }
+        Path gameDir = Minecraft.getInstance().gameDirectory.toPath();
+        try (var stream = Files.newDirectoryStream(gameDir)) {
+            for (Path child : stream) {
+                if (Files.isDirectory(child.resolve("assets"))) {
+                    folders.add(child);
+                }
+            }
+        } catch (IOException e) {
+            SpliceMod.LOGGER.debug("Could not scan game dir for asset folders", e);
+        }
+        return List.copyOf(folders);
+    }
+
+    private void attachMergedPack(ResourceManager manager) {
+        PackResources splice =
+                manager
+                        .listPacks()
+                        .filter(pack -> SplicePackResources.PACK_ID.equals(pack.packId()))
+                        .findFirst()
+                        .orElse(null);
+        MultiPackResourceManager multi = multiPack(manager);
+        if (splice == null || multi == null) {
+            return;
+        }
+        for (String namespace : cache.namespaces()) {
+            FallbackResourceManager fallback = multi.namespacedManagers.get(namespace);
+            if (fallback != null) {
+                fallback.push(splice);
+            }
+        }
+    }
+
+    private Path directoryRoot(PackResources pack) {
+        if (pack instanceof PathPackResources vanilla) {
+            return vanilla.root;
+        }
+        if (pack instanceof net.minecraftforge.resource.PathPackResources forge) {
+            return forge.getSource();
+        }
+        return null;
+    }
 }

@@ -23,6 +23,9 @@ shadowJar {
     exclude { details ->
         details.file.toPath().startsWith(embedOut.get().asFile.toPath())
     }
+    manifest {
+        attributes 'FMLAT': 'accesstransformer.cfg'
+    }
 }
 
 unimined {
@@ -35,6 +38,7 @@ unimined {
         }
         minecraftForge {
             loader loader_version
+            accessTransformer 'src/main/resources/META-INF/accesstransformer.cfg'
         }
         combineWith ':core:main'
         defaultRemapJar = false

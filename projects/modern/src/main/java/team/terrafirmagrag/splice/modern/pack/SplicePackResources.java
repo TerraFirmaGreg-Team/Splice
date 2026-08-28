@@ -2,9 +2,6 @@ package team.terrafirmagrag.splice.modern.pack;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.HashSet;
 import java.util.Set;
 import net.minecraft.SharedConstants;
 import net.minecraft.network.chat.Component;
@@ -14,8 +11,6 @@ import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.metadata.MetadataSectionSerializer;
 import net.minecraft.server.packs.metadata.pack.PackMetadataSection;
 import net.minecraft.server.packs.resources.IoSupplier;
-import net.minecraftforge.fml.ModList;
-import net.minecraftforge.fml.loading.FMLPaths;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import team.terrafirmagrag.splice.format.JsonLangFormat;
@@ -38,11 +33,8 @@ public record SplicePackResources(String packId) implements PackResources {
     if (type != PackType.CLIENT_RESOURCES) {
       return null;
     }
-    String locale = LangPaths.flatLocale(location.getPath(), "json");
-    if (locale == null) {
-      return null;
-    }
-    MergedLangTable table = SpliceMod.CACHE.get(new LocaleKey(location.getNamespace(), locale));
+    MergedLangTable table =
+        SpliceMod.CACHE.tableFor(location.getNamespace(), location.getPath(), "json");
     if (table == null || table.isEmpty()) {
       return null;
     }
@@ -75,29 +67,7 @@ public record SplicePackResources(String packId) implements PackResources {
 
   @Override
   public @NotNull Set<String> getNamespaces(PackType type) {
-    if (type != PackType.CLIENT_RESOURCES) {
-      return Set.of();
-    }
-    return discoverNamespaces();
-  }
-
-  private static Set<String> discoverNamespaces() {
-    Set<String> namespaces = new HashSet<>();
-    ModList.get().getMods().forEach(mod -> namespaces.add(mod.getModId()));
-    Path kubejsAssets = FMLPaths.GAMEDIR.get().resolve("kubejs/assets");
-    if (Files.isDirectory(kubejsAssets)) {
-      try (var stream = Files.newDirectoryStream(kubejsAssets)) {
-        for (Path ns : stream) {
-          if (Files.isDirectory(ns)) {
-            namespaces.add(ns.getFileName().toString());
-          }
-        }
-      } catch (Exception e) {
-        SpliceMod.LOGGER.debug("Failed to scan kubejs/assets namespaces", e);
-      }
-    }
-    SpliceMod.CACHE.snapshot().keySet().forEach(key -> namespaces.add(key.namespace()));
-    return Set.copyOf(namespaces);
+    return type == PackType.CLIENT_RESOURCES ? SpliceMod.CACHE.namespaces() : Set.of();
   }
 
   @Override

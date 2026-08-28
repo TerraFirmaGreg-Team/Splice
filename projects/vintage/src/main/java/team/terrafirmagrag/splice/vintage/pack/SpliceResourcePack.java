@@ -14,10 +14,8 @@ import net.minecraft.client.resources.data.IMetadataSection;
 import net.minecraft.client.resources.data.MetadataSerializer;
 import net.minecraft.util.ResourceLocation;
 import team.terrafirmagrag.splice.format.PropertiesLangFormat;
-import team.terrafirmagrag.splice.model.LocaleKey;
 import team.terrafirmagrag.splice.model.MergedLangCache;
 import team.terrafirmagrag.splice.model.MergedLangTable;
-import team.terrafirmagrag.splice.util.LangPaths;
 import team.terrafirmagrag.splice.vintage.reload.LangCacheBuilder;
 
 public final class SpliceResourcePack implements IResourcePack, IResourceManagerReloadListener {
@@ -43,11 +41,7 @@ public final class SpliceResourcePack implements IResourcePack, IResourceManager
 
   @Override
   public InputStream getInputStream(ResourceLocation location) throws IOException {
-    String locale = LangPaths.flatLocale(location.getPath(), "lang");
-    if (locale == null) {
-      throw new IOException("Not a merged lang resource: " + location);
-    }
-    MergedLangTable table = cache.get(new LocaleKey(location.getNamespace(), locale));
+    MergedLangTable table = cache.tableFor(location.getNamespace(), location.getPath(), "lang");
     if (table == null || table.isEmpty()) {
       throw new IOException("No merged lang for " + location);
     }
@@ -59,17 +53,13 @@ public final class SpliceResourcePack implements IResourcePack, IResourceManager
     if (builder.isRebuilding()) {
       return false;
     }
-    String locale = LangPaths.flatLocale(location.getPath(), "lang");
-    if (locale == null) {
-      return false;
-    }
-    MergedLangTable table = cache.get(new LocaleKey(location.getNamespace(), locale));
+    MergedLangTable table = cache.tableFor(location.getNamespace(), location.getPath(), "lang");
     return table != null && !table.isEmpty();
   }
 
   @Override
   public Set<String> getResourceDomains() {
-    return builder.discoverNamespaces();
+    return cache.namespaces();
   }
 
   @Override

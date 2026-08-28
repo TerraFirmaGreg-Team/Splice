@@ -16,6 +16,7 @@ unimined {
         }
         cleanroom {
             loader loader_version
+            accessTransformer 'src/main/resources/META-INF/accesstransformer.cfg'
         }
         combineWith ':core:main'
         defaultRemapJar = false
@@ -26,5 +27,6 @@ unimined {
 shadowJar {
     manifest {
         attributes 'ModType': 'CRL'
+        attributes 'FMLAT': 'accesstransformer.cfg'
     }
 }

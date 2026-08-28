@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 class MergedLangCacheTest {
@@ -18,6 +19,7 @@ class MergedLangCacheTest {
 
     assertEquals(table, cache.get(key));
     assertEquals(1, cache.snapshot().size());
+    assertEquals(Set.of("mymod"), cache.namespaces());
   }
 
   @Test
@@ -28,5 +30,18 @@ class MergedLangCacheTest {
     cache.replace(Map.of());
     assertNull(cache.get(key));
     assertEquals(0, cache.snapshot().size());
+  }
+
+  @Test
+  void tableForLooksUpFlatLangPath() {
+    MergedLangCache cache = new MergedLangCache();
+    LocaleKey key = new LocaleKey("mymod", "en_us");
+    MergedLangTable table = new MergedLangTable(Map.of("a", "1"));
+    cache.replace(Map.of(key, table));
+
+    assertEquals(table, cache.tableFor("mymod", "lang/en_us.json", "json"));
+    assertNull(cache.tableFor("mymod", "lang/en_us/items.json", "json"));
+    assertNull(cache.tableFor("other", "lang/en_us.json", "json"));
+    assertNull(cache.tableFor("mymod", "textures/block.png", "json"));
   }
 }
