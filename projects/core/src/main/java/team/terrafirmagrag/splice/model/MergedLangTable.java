@@ -6,11 +6,11 @@ import java.util.Map;
 
 public record MergedLangTable(Map<String, String> entries) {
 
-  public MergedLangTable(Map<String, String> entries) {
-    this.entries = Collections.unmodifiableMap(new LinkedHashMap<>(entries));
-  }
+    public MergedLangTable(Map<String, String> entries) {
+        this.entries = Collections.unmodifiableMap(new LinkedHashMap<>(entries));
+    }
 
-  public boolean isEmpty() {
-    return entries.isEmpty();
-  }
+    public boolean isEmpty() {
+        return entries.isEmpty();
+    }
 }

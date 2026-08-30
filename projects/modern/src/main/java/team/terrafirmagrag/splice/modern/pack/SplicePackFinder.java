@@ -1,5 +1,6 @@
 package team.terrafirmagrag.splice.modern.pack;
 
+import lombok.experimental.UtilityClass;
 import net.minecraft.SharedConstants;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.packs.PackType;
@@ -14,44 +15,31 @@ import net.minecraftforge.fml.common.Mod;
 import team.terrafirmagrag.splice.modern.SpliceMod;
 import team.terrafirmagrag.splice.modern.reload.LangCacheBuilder;
 
-@Mod.EventBusSubscriber(
-    modid = SpliceMod.MOD_ID,
-    bus = Mod.EventBusSubscriber.Bus.MOD,
-    value = Dist.CLIENT)
+@Mod.EventBusSubscriber(modid = SpliceMod.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
+@UtilityClass
 public final class SplicePackFinder {
-
-  private SplicePackFinder() {}
-
-  @SubscribeEvent
-  public static void onAddPackFinders(AddPackFindersEvent event) {
-    if (event.getPackType() != PackType.CLIENT_RESOURCES) {
-      return;
+    @SubscribeEvent
+    public static void onAddPackFinders(AddPackFindersEvent event) {
+        if (event.getPackType() != PackType.CLIENT_RESOURCES) {
+            return;
+        }
+        Component description = Component.literal("Splice Merged Lang");
+        int packFormat = SharedConstants.getCurrentVersion().getPackVersion(PackType.CLIENT_RESOURCES);
+        Pack.Info info = new Pack.Info(description, packFormat, packFormat, FeatureFlagSet.of(), true);
+        event.addRepositorySource(consumer -> consumer.accept(Pack.create(
+                SplicePackResources.PACK_ID,
+                description,
+                true,
+                SplicePackResources::new,
+                info,
+                event.getPackType(),
+                Pack.Position.TOP,
+                true,
+                PackSource.BUILT_IN)));
     }
-    Component description = Component.literal("Splice Merged Lang");
-    Pack.Info info =
-        new Pack.Info(
-            description,
-            SharedConstants.RESOURCE_PACK_FORMAT,
-            SharedConstants.RESOURCE_PACK_FORMAT,
-            FeatureFlagSet.of(),
-            true);
-    event.addRepositorySource(
-        consumer ->
-            consumer.accept(
-                Pack.create(
-                    SplicePackResources.PACK_ID,
-                    description,
-                    true,
-                    SplicePackResources::new,
-                    info,
-                    event.getPackType(),
-                    Pack.Position.TOP,
-                    true,
-                    PackSource.BUILT_IN)));
-  }
 
-  @SubscribeEvent
-  public static void onRegisterReloadListeners(RegisterClientReloadListenersEvent event) {
-    event.registerReloadListener(new LangCacheBuilder(SpliceMod.CACHE));
-  }
+    @SubscribeEvent
+    public static void onRegisterReloadListeners(RegisterClientReloadListenersEvent event) {
+        event.registerReloadListener(new LangCacheBuilder(SpliceMod.CACHE));
+    }
 }

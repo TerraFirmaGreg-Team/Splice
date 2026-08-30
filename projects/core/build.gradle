@@ -5,10 +5,6 @@ plugins {
 dependencies {
     implementation libs.jackson.databind
     compileOnly libs.log4j.api
-    compileOnly libs.lombok
-    annotationProcessor libs.lombok
-    testCompileOnly libs.lombok
-    testAnnotationProcessor libs.lombok
     testImplementation platform(libs.junit.bom)
     testImplementation libs.junit.jupiter
     testRuntimeOnly libs.junit.platform.launcher

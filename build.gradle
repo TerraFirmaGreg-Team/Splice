@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.unimined) apply false
     alias(libs.plugins.shadow) apply false
+    alias(libs.plugins.spotless) apply false
 }
 
 allprojects {
@@ -20,9 +21,27 @@ subprojects {
             mavenCentral()
         }
 
+        dependencies {
+            compileOnly libs.lombok
+            annotationProcessor libs.lombok
+        }
+
         tasks.withType(JavaCompile).configureEach {
             options.encoding = 'UTF-8'
             options.release = (findProperty('java_version') as String).toInteger()
+            options.compilerArgs << '-Xlint:deprecation'
+        }
+
+        apply plugin: 'com.diffplug.spotless'
+        spotless {
+            encoding 'UTF-8'
+            java {
+                target 'src/*/java/**/*.java'
+                palantirJavaFormat(libs.versions.palantir.java.format.get()).formatJavadoc(true)
+                removeUnusedImports()
+                trimTrailingWhitespace()
+                endWithNewline()
+            }
         }
     }
 
@@ -67,13 +86,13 @@ subprojects {
 
         tasks.named('processResources').configure {
             def props = [
-                    mod_id         : findProperty('mod_id'),
-                    mod_name       : findProperty('mod_name'),
-                    mod_version    : findProperty('mod_version'),
-                    mod_description: findProperty('mod_description'),
-                    mod_authors    : findProperty('mod_authors'),
-                    mod_url        : findProperty('mod_url'),
-                    mod_logo_path  : findProperty('mod_logo_path'),
+                    mod_id         : providers.gradleProperty('mod_id').get(),
+                    mod_name       : providers.gradleProperty('mod_name').get(),
+                    mod_version    : providers.gradleProperty('mod_version').get(),
+                    mod_description: providers.gradleProperty('mod_description').get(),
+                    mod_authors    : providers.gradleProperty('mod_authors').get(),
+                    mod_url        : providers.gradleProperty('mod_url').get(),
+                    mod_logo_path  : providers.gradleProperty('mod_logo_path').get(),
             ]
             inputs.properties props
             filesMatching(['META-INF/mods.toml', 'mcmod.info']) {

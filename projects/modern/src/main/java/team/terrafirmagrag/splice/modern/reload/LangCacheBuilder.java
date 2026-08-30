@@ -1,19 +1,5 @@
 package team.terrafirmagrag.splice.modern.reload;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.packs.PackResources;
-import net.minecraft.server.packs.PathPackResources;
-import net.minecraft.server.packs.resources.*;
-import net.minecraft.util.profiling.ProfilerFiller;
-import org.jetbrains.annotations.NotNull;
-import team.terrafirmagrag.splice.format.JsonLangFormat;
-import team.terrafirmagrag.splice.merge.LangFragmentMerger;
-import team.terrafirmagrag.splice.merge.LangMergePipeline;
-import team.terrafirmagrag.splice.model.*;
-import team.terrafirmagrag.splice.modern.SpliceMod;
-import team.terrafirmagrag.splice.modern.pack.SplicePackResources;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -21,16 +7,26 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.BiConsumer;
+import lombok.RequiredArgsConstructor;
+import net.minecraft.client.Minecraft;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.packs.PackResources;
+import net.minecraft.server.packs.PathPackResources;
+import net.minecraft.server.packs.resources.*;
+import net.minecraft.util.profiling.ProfilerFiller;
+import org.jetbrains.annotations.NotNull;
+import team.terrafirmagrag.splice.SpliceLog;
+import team.terrafirmagrag.splice.format.JsonLangFormat;
+import team.terrafirmagrag.splice.merge.LangFragmentMerger;
+import team.terrafirmagrag.splice.merge.LangMergePipeline;
+import team.terrafirmagrag.splice.model.*;
+import team.terrafirmagrag.splice.modern.pack.SplicePackResources;
 
+@RequiredArgsConstructor
 public final class LangCacheBuilder implements PreparableReloadListener {
 
     private final MergedLangCache cache;
-    private final MergePolicy policy;
-
-    public LangCacheBuilder(MergedLangCache cache) {
-        this.cache = cache;
-        this.policy = MergePolicy.withLogger(SpliceMod.LOGGER);
-    }
+    private final MergePolicy policy = MergePolicy.withLogger();
 
     private static MultiPackResourceManager multiPack(ResourceManager manager) {
         if (manager instanceof MultiPackResourceManager multi) {
@@ -57,18 +53,15 @@ public final class LangCacheBuilder implements PreparableReloadListener {
                         tables -> {
                             cache.replace(tables);
                             attachMergedPack(manager);
-                            List<String> keys =
-                                    tables.keySet().stream()
-                                            .map(key -> key.namespace() + "/" + key.localeCode())
-                                            .sorted()
-                                            .toList();
-                            SpliceMod.LOGGER.info(
-                                "Splice merged {} namespace/locale lang table(s): {}",
-                                tables.size(),
-                                keys);
+                            List<String> keys = tables.keySet().stream()
+                                    .map(key -> key.namespace() + "/" + key.localeCode())
+                                    .sorted()
+                                    .toList();
+                            SpliceLog.log.info(
+                                    "Splice merged {} namespace/locale lang table(s): {}", tables.size(), keys);
                             Minecraft mc = Minecraft.getInstance();
                             if (mc.getLanguageManager() != null) {
-                              mc.getLanguageManager().onResourceManagerReload(manager);
+                                mc.getLanguageManager().onResourceManagerReload(manager);
                             }
                         },
                         gameExecutor);
@@ -92,13 +85,10 @@ public final class LangCacheBuilder implements PreparableReloadListener {
 
             @Override
             public void extraPaths(BiConsumer<String, String> sink) {
-                manager
-                        .listResourceStacks("lang", location -> true)
+                manager.listResourceStacks("lang", location -> true)
                         .keySet()
-                        .forEach(
-                                location ->
-                                        sink.accept(
-                                                location.getNamespace(), location.getPath().toLowerCase(Locale.ROOT)));
+                        .forEach(location -> sink.accept(
+                                location.getNamespace(), location.getPath().toLowerCase(Locale.ROOT)));
             }
         };
     }
@@ -110,10 +100,10 @@ public final class LangCacheBuilder implements PreparableReloadListener {
                 continue;
             }
             try (var in = resource.open()) {
-                Map<String, String> parsed = JsonLangFormat.parse(in, JsonLangFormat.nestedWarningLogger(SpliceMod.LOGGER));
+                Map<String, String> parsed = JsonLangFormat.parse(in, JsonLangFormat.nestedWarningLogger());
                 LangFragmentMerger.mergeInto(policy, merged, parsed);
             } catch (Exception e) {
-                SpliceMod.LOGGER.warn("Failed to read lang resource {}", id, e);
+                SpliceLog.log.warn("Failed to read lang resource {}", id, e);
             }
         }
         return merged;
@@ -138,18 +128,16 @@ public final class LangCacheBuilder implements PreparableReloadListener {
                 }
             }
         } catch (IOException e) {
-            SpliceMod.LOGGER.debug("Could not scan game dir for asset folders", e);
+            SpliceLog.log.debug("Could not scan game dir for asset folders", e);
         }
         return List.copyOf(folders);
     }
 
     private void attachMergedPack(ResourceManager manager) {
-        PackResources splice =
-                manager
-                        .listPacks()
-                        .filter(pack -> SplicePackResources.PACK_ID.equals(pack.packId()))
-                        .findFirst()
-                        .orElse(null);
+        PackResources splice = manager.listPacks()
+                .filter(pack -> SplicePackResources.PACK_ID.equals(pack.packId()))
+                .findFirst()
+                .orElse(null);
         MultiPackResourceManager multi = multiPack(manager);
         if (splice == null || multi == null) {
             return;

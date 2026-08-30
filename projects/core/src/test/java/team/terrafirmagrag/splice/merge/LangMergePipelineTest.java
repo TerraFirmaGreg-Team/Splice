@@ -1,11 +1,6 @@
 package team.terrafirmagrag.splice.merge;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-import team.terrafirmagrag.splice.model.Extra;
-import team.terrafirmagrag.splice.model.LocaleKey;
-import team.terrafirmagrag.splice.model.MergePolicy;
-import team.terrafirmagrag.splice.model.MergedLangTable;
+import static org.junit.jupiter.api.Assertions.*;
 
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -15,8 +10,12 @@ import java.util.Map;
 import java.util.function.BiConsumer;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
-
-import static org.junit.jupiter.api.Assertions.*;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import team.terrafirmagrag.splice.model.Extra;
+import team.terrafirmagrag.splice.model.LocaleKey;
+import team.terrafirmagrag.splice.model.MergePolicy;
+import team.terrafirmagrag.splice.model.MergedLangTable;
 
 class LangMergePipelineTest {
 
@@ -38,8 +37,7 @@ class LangMergePipelineTest {
         };
     }
 
-    private static String value(
-            Map<LocaleKey, MergedLangTable> tables, String namespace, String locale, String key) {
+    private static String value(Map<LocaleKey, MergedLangTable> tables, String namespace, String locale, String key) {
         return tables.get(new LocaleKey(namespace, locale)).entries().get(key);
     }
 
@@ -130,8 +128,7 @@ class LangMergePipelineTest {
         Path fakeJar = temp.resolve("broken.jar");
         Files.writeString(fakeJar, "not a zip", StandardCharsets.UTF_8);
 
-        Map<LocaleKey, MergedLangTable> tables =
-                assertDoesNotThrow(() -> merge(List.of(fakeJar), Extra.NONE));
+        Map<LocaleKey, MergedLangTable> tables = assertDoesNotThrow(() -> merge(List.of(fakeJar), Extra.NONE));
 
         assertTrue(tables.isEmpty());
     }

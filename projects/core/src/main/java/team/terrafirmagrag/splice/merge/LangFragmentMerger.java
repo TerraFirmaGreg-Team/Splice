@@ -10,33 +10,33 @@ import team.terrafirmagrag.splice.model.MergePolicy;
 @UtilityClass
 public class LangFragmentMerger {
 
-  public Map<String, String> merge(
-      MergePolicy policy, Optional<Map<String, String>> flat, List<Map<String, String>> fragments) {
-    Map<String, String> merged = new LinkedHashMap<>();
-    flat.ifPresent(layer -> mergeInto(policy, merged, layer));
-    for (Map<String, String> fragment : fragments) {
-      mergeInto(policy, merged, fragment);
+    public Map<String, String> merge(
+            MergePolicy policy, Optional<Map<String, String>> flat, List<Map<String, String>> fragments) {
+        Map<String, String> merged = new LinkedHashMap<>();
+        flat.ifPresent(layer -> mergeInto(policy, merged, layer));
+        for (Map<String, String> fragment : fragments) {
+            mergeInto(policy, merged, fragment);
+        }
+        return merged;
     }
-    return merged;
-  }
 
-  public void mergeInto(MergePolicy policy, Map<String, String> into, Map<String, String> layer) {
-    if (layer.isEmpty()) {
-      return;
+    public void mergeInto(MergePolicy policy, Map<String, String> into, Map<String, String> layer) {
+        if (layer.isEmpty()) {
+            return;
+        }
+        for (Map.Entry<String, String> entry : layer.entrySet()) {
+            String key = entry.getKey();
+            if (key == null || policy.shouldSkipKey(key)) {
+                continue;
+            }
+            String value = entry.getValue();
+            if (value == null) {
+                continue;
+            }
+            String previous = into.put(key, value);
+            if (previous != null && !previous.equals(value)) {
+                policy.onDuplicateOverride().accept(key, previous + " → " + value);
+            }
+        }
     }
-    for (Map.Entry<String, String> entry : layer.entrySet()) {
-      String key = entry.getKey();
-      if (key == null || policy.shouldSkipKey(key)) {
-        continue;
-      }
-      String value = entry.getValue();
-      if (value == null) {
-        continue;
-      }
-      String previous = into.put(key, value);
-      if (previous != null && !previous.equals(value)) {
-        policy.onDuplicateOverride().accept(key, previous + " → " + value);
-      }
-    }
-  }
 }
