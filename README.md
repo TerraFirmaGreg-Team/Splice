@@ -2,7 +2,7 @@
 <div align="center">
   <h1>Splice</h1>
   <a href="https://github.com/TerraFirmaGreg-Team/Splice">
-    <img src="projects/core/src/main/resources/logo.png" alt="Logo" height="120"/>
+    <img src="https://github.com/TerraFirmaGreg-Team/Splice/blob/42a7620da3336264ec5f60c67c36d33a83d5ff6e/projects/core/src/main/resources/logo.png?raw=true" alt="Logo" height="120"/>
   </a>
 </div>
 
