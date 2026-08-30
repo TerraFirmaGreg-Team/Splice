@@ -10,16 +10,8 @@
 
 ---
 
-Client-side mod that merges split lang folders at reload. 
-Flat `lang/{locale}.json` / `.lang` plus `lang/{locale}/**` fragments are served as one synthetic file from a virtual pack at **TOP**
-
-## Build
-
-```bash
-./gradlew :core:test
-./gradlew :modern:remapShadowJar   # build/libs/Splice-Modern-*.jar
-./gradlew :vintage:remapShadowJar  # build/libs/Splice-Vintage-*.jar
-```
+Client-side mod that merges split lang folders at reload. Flat `lang/{locale}.json` / `.lang` plus `lang/{locale}/**`
+fragments are served as one synthetic file from a virtual pack at **TOP**
 
 ## Authoring
 

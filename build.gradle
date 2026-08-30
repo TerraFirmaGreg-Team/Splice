@@ -61,8 +61,8 @@ subprojects {
             archiveClassifier = ''
         }
 
-        tasks.named('build') {
-            dependsOn tasks.matching { it.name == 'remapShadowJar' }
+        tasks.named('build').configure {
+            dependsOn('remapShadowJar')
         }
 
         tasks.named('processResources').configure {

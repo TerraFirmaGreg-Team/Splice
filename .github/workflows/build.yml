@@ -135,7 +135,7 @@ jobs:
       - name: "[🔨] Build"
         run: |
           chmod +x gradlew
-          ./gradlew :${{ matrix.platform }}:remapShadowJar --no-daemon
+          ./gradlew :${{ matrix.platform }}:build --no-daemon
           ls -la build/libs/
 
       - name: "[🚀] Upload Artifact"
