@@ -70,7 +70,8 @@ subprojects {
             from { project(':core').sourceSets.main.output }
             configurations.set([embedConfig])
             enableAutoRelocation = true
-            relocationPrefix = "${mod_package}.${mod_id}.repack"
+            relocationPrefix = "${mod_package}.${mod_id}.shadow"
+            mergeServiceFiles()
             destinationDirectory = layout.buildDirectory.dir('tmp')
             archiveClassifier = ''
         }

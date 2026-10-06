@@ -85,12 +85,33 @@ public final class LangCacheBuilder implements PreparableReloadListener {
 
             @Override
             public void extraPaths(BiConsumer<String, String> sink) {
-                manager.listResourceStacks("lang", location -> true)
-                        .keySet()
-                        .forEach(location -> sink.accept(
-                                location.getNamespace(), location.getPath().toLowerCase(Locale.ROOT)));
+                MultiPackResourceManager multi = multiPack(manager);
+                if (multi == null) {
+                    listLangPaths(manager, sink);
+                    return;
+                }
+                for (FallbackResourceManager nsManager : multi.namespacedManagers.values()) {
+                    try {
+                        listLangPaths(nsManager, sink);
+                    } catch (RuntimeException e) {
+                        SpliceLog.log.warn("Skipping lang resource listing for a namespace: {}", e.getMessage());
+                    }
+                }
             }
         };
+    }
+
+    private void listLangPaths(ResourceManager resources, BiConsumer<String, String> sink) {
+        resources
+                .listResourceStacks("lang", this::isLangFile)
+                .keySet()
+                .forEach(location ->
+                        sink.accept(location.getNamespace(), location.getPath().toLowerCase(Locale.ROOT)));
+    }
+
+    private boolean isLangFile(ResourceLocation location) {
+        String path = location.getPath();
+        return path.endsWith(".json") || path.endsWith(".lang");
     }
 
     private Map<String, String> mergeResourceStack(ResourceLocation id, List<Resource> stack) {
