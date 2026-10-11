@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import lombok.RequiredArgsConstructor;
 import net.minecraft.client.Minecraft;
@@ -26,7 +27,6 @@ import team.terrafirmagrag.splice.modern.pack.SplicePackResources;
 public final class LangCacheBuilder implements PreparableReloadListener {
 
     private final MergedLangCache cache;
-    private final MergePolicy policy = MergePolicy.withLogger();
 
     private static MultiPackResourceManager multiPack(ResourceManager manager) {
         if (manager instanceof MultiPackResourceManager multi) {
@@ -47,7 +47,9 @@ public final class LangCacheBuilder implements PreparableReloadListener {
             ProfilerFiller reloadProfiler,
             Executor backgroundExecutor,
             Executor gameExecutor) {
-        return CompletableFuture.supplyAsync(() -> build(manager), backgroundExecutor)
+        AtomicInteger overrides = new AtomicInteger();
+        MergePolicy policy = MergePolicy.withLogger(overrides);
+        return CompletableFuture.supplyAsync(() -> build(manager, policy), backgroundExecutor)
                 .thenCompose(barrier::wait)
                 .thenAcceptAsync(
                         tables -> {
@@ -58,7 +60,10 @@ public final class LangCacheBuilder implements PreparableReloadListener {
                                     .sorted()
                                     .toList();
                             SpliceLog.log.info(
-                                    "Splice merged {} namespace/locale lang table(s): {}", tables.size(), keys);
+                                    "Splice merged {} namespace/locale lang table(s) ({} key(s) overwritten): {}",
+                                    tables.size(),
+                                    overrides.get(),
+                                    keys);
                             Minecraft mc = Minecraft.getInstance();
                             if (mc.getLanguageManager() != null) {
                                 mc.getLanguageManager().onResourceManagerReload(manager);
@@ -67,20 +72,20 @@ public final class LangCacheBuilder implements PreparableReloadListener {
                         gameExecutor);
     }
 
-    private Map<LocaleKey, MergedLangTable> build(ResourceManager manager) {
+    private Map<LocaleKey, MergedLangTable> build(ResourceManager manager, MergePolicy policy) {
         Map<LocaleKey, MergedLangTable> tables =
-                LangMergePipeline.merge(packFolders(manager), extra(manager), "json", policy);
+                LangMergePipeline.merge(packFolders(manager), extra(manager, policy), "json", policy);
         Set<String> known = manager.getNamespaces();
         tables.keySet().removeIf(key -> !known.contains(key.namespace()));
         return tables;
     }
 
-    private Extra extra(ResourceManager manager) {
+    private Extra extra(ResourceManager manager, MergePolicy policy) {
         return new Extra() {
             @Override
             public Map<String, String> get(String namespace, String path) {
                 ResourceLocation id = ResourceLocation.tryBuild(namespace, path);
-                return id == null ? Map.of() : mergeResourceStack(id, manager.getResourceStack(id));
+                return id == null ? Map.of() : mergeResourceStack(id, manager.getResourceStack(id), policy);
             }
 
             @Override
@@ -114,7 +119,7 @@ public final class LangCacheBuilder implements PreparableReloadListener {
         return path.endsWith(".json") || path.endsWith(".lang");
     }
 
-    private Map<String, String> mergeResourceStack(ResourceLocation id, List<Resource> stack) {
+    private Map<String, String> mergeResourceStack(ResourceLocation id, List<Resource> stack, MergePolicy policy) {
         Map<String, String> merged = new LinkedHashMap<>();
         for (Resource resource : stack) {
             if (SplicePackResources.PACK_ID.equals(resource.sourcePackId())) {

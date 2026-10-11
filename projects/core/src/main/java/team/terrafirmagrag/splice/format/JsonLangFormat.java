@@ -59,6 +59,6 @@ public class JsonLangFormat {
     }
 
     public BiConsumer<String, String> nestedWarningLogger() {
-        return (key, message) -> SpliceLog.log.warn("Skipping lang key \"{}\": {}", key, message);
+        return (key, message) -> SpliceLog.log.debug("Skipping lang key \"{}\": {}", key, message);
     }
 }

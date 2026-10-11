@@ -35,7 +35,7 @@ public class LangFragmentMerger {
             }
             String previous = into.put(key, value);
             if (previous != null && !previous.equals(value)) {
-                policy.onDuplicateOverride().accept(key, previous + " → " + value);
+                policy.onDuplicateOverride().accept(key, previous + " -> " + value);
             }
         }
     }

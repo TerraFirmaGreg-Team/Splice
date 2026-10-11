@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.Test;
 import team.terrafirmagrag.splice.model.MergePolicy;
 
@@ -72,6 +73,17 @@ class LangFragmentMergerTest {
 
         assertEquals(1, warnings.size());
         assertTrue(warnings.get(0).startsWith("shared:"));
+    }
+
+    @Test
+    void withLoggerCountsOverrides() {
+        Map<String, String> flat = Map.of("a", "first", "b", "first");
+        Map<String, String> frag = Map.of("a", "second", "b", "first");
+        AtomicInteger overrides = new AtomicInteger();
+
+        LangFragmentMerger.merge(MergePolicy.withLogger(overrides), Optional.of(flat), List.of(frag));
+
+        assertEquals(1, overrides.get());
     }
 
     @Test

@@ -7,6 +7,7 @@ import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import net.minecraft.client.Minecraft;
@@ -38,7 +39,8 @@ public final class LangCacheBuilder {
         }
         rebuilding = true;
         try {
-            MergePolicy policy = MergePolicy.withLogger();
+            AtomicInteger overrides = new AtomicInteger();
+            MergePolicy policy = MergePolicy.withLogger(overrides);
             Map<LocaleKey, MergedLangTable> out = LangMergePipeline.merge(
                     packRoots(),
                     (namespace, path) -> mergeResourceStack(manager, new ResourceLocation(namespace, path), policy),
@@ -47,7 +49,10 @@ public final class LangCacheBuilder {
             Set<String> known = manager.getResourceDomains();
             out.keySet().removeIf(key -> !known.contains(key.namespace()));
             cache.replace(out);
-            SpliceLog.log.info("Splice vintage merged {} namespace/locale lang table(s)", out.size());
+            SpliceLog.log.info(
+                    "Splice vintage merged {} namespace/locale lang table(s) ({} key(s) overwritten)",
+                    out.size(),
+                    overrides.get());
         } finally {
             rebuilding = false;
         }
